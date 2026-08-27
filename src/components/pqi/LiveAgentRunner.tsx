@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bot, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,10 +12,19 @@ import {
 type Props = { input: DeviationInvestigationInput };
 
 export function LiveAgentRunner({ input }: Props) {
+  const [agentInput, setAgentInput] = useState<DeviationInvestigationInput>(input);
   const [investigation, setInvestigation] = useState<DeviationInvestigationResult>();
   const [qaReview, setQaReview] = useState<QARecommendationResult>();
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    setAgentInput(input);
+  }, [input.deviationId, input.description, input.equipment, input.batch, input.risk, input.investigationNotes]);
+
+  const updateInput = (field: keyof DeviationInvestigationInput, value: string) => {
+    setAgentInput((current) => ({ ...current, [field]: value }));
+  };
 
   const runAgents = async () => {
     setRunning(true);
@@ -24,11 +33,11 @@ export function LiveAgentRunner({ input }: Props) {
     setQaReview(undefined);
 
     try {
-      const investigationResult = await runDeviationInvestigationAgent({ data: input });
+      const investigationResult = await runDeviationInvestigationAgent({ data: agentInput });
       setInvestigation(investigationResult);
 
       const qaResult = await runQARecommendationAgent({
-        data: { deviation: input, investigation: investigationResult },
+        data: { deviation: agentInput, investigation: investigationResult },
       });
       setQaReview(qaResult);
     } catch (caught) {
@@ -47,13 +56,46 @@ export function LiveAgentRunner({ input }: Props) {
             <h2 className="font-semibold">Live AI Agent Review</h2>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Run the Deviation Investigation Agent followed by an independent QA Recommendation Agent.
+            Edit the current deviation details below. The agents will use exactly these values when you click Run live agents.
           </p>
         </div>
-        <Button onClick={runAgents} disabled={running}>
+        <Button onClick={runAgents} disabled={running || !agentInput.description.trim()}>
           {running ? <Loader2 className="size-4 animate-spin" /> : <Bot className="size-4" />}
           {running ? "Running agents..." : "Run live agents"}
         </Button>
+      </div>
+
+      <div className="grid gap-3 rounded-lg border border-border p-4 md:grid-cols-2">
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">Deviation ID</span>
+          <input className="w-full rounded-md border border-input bg-background px-3 py-2" value={agentInput.deviationId ?? ""} onChange={(event) => updateInput("deviationId", event.target.value)} />
+        </label>
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">Batch</span>
+          <input className="w-full rounded-md border border-input bg-background px-3 py-2" value={agentInput.batch ?? ""} onChange={(event) => updateInput("batch", event.target.value)} />
+        </label>
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">Equipment / Area</span>
+          <input className="w-full rounded-md border border-input bg-background px-3 py-2" value={agentInput.equipment ?? ""} onChange={(event) => updateInput("equipment", event.target.value)} />
+        </label>
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">Current risk</span>
+          <select className="w-full rounded-md border border-input bg-background px-3 py-2" value={agentInput.risk ?? ""} onChange={(event) => updateInput("risk", event.target.value)}>
+            <option value="">Not specified</option>
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+            <option value="Critical">Critical</option>
+          </select>
+        </label>
+        <label className="space-y-1 text-sm md:col-span-2">
+          <span className="font-medium">Deviation description</span>
+          <textarea className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2" value={agentInput.description} onChange={(event) => updateInput("description", event.target.value)} />
+        </label>
+        <label className="space-y-1 text-sm md:col-span-2">
+          <span className="font-medium">Investigation notes</span>
+          <textarea className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2" value={agentInput.investigationNotes ?? ""} onChange={(event) => updateInput("investigationNotes", event.target.value)} placeholder="Add the latest observations, evidence, measurements, or changes here" />
+        </label>
       </div>
 
       {error ? <p className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">{error}</p> : null}
