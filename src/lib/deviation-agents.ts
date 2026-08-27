@@ -29,6 +29,14 @@ const qaResultSchema = z.object({
 
 type InvestigationInput = z.infer<typeof investigationInputSchema>;
 
+type GeminiInteraction = {
+  output_text?: string | null;
+  steps?: Array<{
+    type?: string;
+    content?: Array<{ type?: string; text?: string }>;
+  }>;
+};
+
 async function callGemini<T>(prompt: string, schema: z.ZodType<T>): Promise<T> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -36,16 +44,18 @@ async function callGemini<T>(prompt: string, schema: z.ZodType<T>): Promise<T> {
   }
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    "https://generativelanguage.googleapis.com/v1beta/interactions",
     {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": apiKey,
+        "Api-Revision": "2026-05-20",
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.2,
-        },
+        model: "gemini-3.6-flash",
+        input: prompt,
+        store: false,
       }),
     },
   );
@@ -55,13 +65,25 @@ async function callGemini<T>(prompt: string, schema: z.ZodType<T>): Promise<T> {
     throw new Error(`Gemini request failed: ${response.status} ${message}`);
   }
 
-  const payload = (await response.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+  const payload = (await response.json()) as GeminiInteraction;
+  const text =
+    payload.output_text ??
+    payload.steps
+      ?.filter((step) => step.type === "model_output")
+      .flatMap((step) => step.content ?? [])
+      .filter((content) => content.type === "text")
+      .map((content) => content.text ?? "")
+      .join("\n");
+
   if (!text) throw new Error("Gemini returned no response text.");
 
-  return schema.parse(JSON.parse(text));
+  try {
+    return schema.parse(JSON.parse(text));
+  } catch (error) {
+    throw new Error(
+      `Gemini returned invalid agent JSON: ${error instanceof Error ? error.message : "unknown error"}`,
+    );
+  }
 }
 
 /**
