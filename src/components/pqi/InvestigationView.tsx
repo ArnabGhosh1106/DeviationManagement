@@ -10,21 +10,24 @@ import { useAgentSequence } from "./useAgentSequence";
 import { buildDeviationAgents, type DeviationAgentInput } from "@/lib/ai-agents";
 import type { Risk } from "@/lib/mock-data";
 
+const VALID_RISKS: Risk[] = ["Low", "Medium", "High", "Critical"];
+
+const display = (value?: string) => value?.trim() || "Not specified";
+
 export function InvestigationView({
   investigationId,
-  deviationId,
-  headline,
-  risk,
   agentInput,
 }: {
   investigationId: string;
-  deviationId: string;
-  headline: string;
-  risk: Risk;
   agentInput: DeviationAgentInput;
 }) {
   const agents = buildDeviationAgents(agentInput);
   const { states, completed, progress, allDone, start } = useAgentSequence(agents.length, 2000);
+  const deviationId = display(agentInput.deviationId || investigationId);
+  const headline = display(agentInput.description);
+  const risk = VALID_RISKS.includes(agentInput.risk as Risk)
+    ? (agentInput.risk as Risk)
+    : undefined;
 
   return (
     <div className="space-y-8 pb-10">
@@ -55,10 +58,10 @@ export function InvestigationView({
 
       {allDone ? (
         <>
-          <InvestigationSummary risk={risk} />
-          <EvidenceCard />
+          <InvestigationSummary risk={risk} input={agentInput} />
+          <EvidenceCard input={agentInput} />
           <div className="flex justify-end"><Button size="lg" asChild><a href="#qa-review"><Send className="size-4" />Send to QA Review</a></Button></div>
-          <div id="qa-review" className="scroll-mt-8"><QAReview recordId={agentInput.deviationId?.trim() || deviationId} /></div>
+          <div id="qa-review" className="scroll-mt-8"><QAReview recordId={deviationId} /></div>
         </>
       ) : null}
     </div>
