@@ -1,10 +1,3 @@
-/**
- * Simulated AI agent layer.
- * Change-impact agents still use mock results. Investigation agents can now be
- * derived from the live deviation input so the workflow never remains tied to
- * the original B12345 example.
- */
-
 export type AgentState = "Pending" | "Running" | "Completed" | "Failed";
 
 export interface AgentResult {
@@ -23,8 +16,12 @@ export interface AgentDefinition {
 export interface DeviationAgentInput {
   deviationId?: string;
   description: string;
+  classification?: string;
+  area?: string;
   equipment?: string;
   batch?: string;
+  occurredAt?: string;
+  reporter?: string;
   risk?: string;
   investigationNotes?: string;
 }
@@ -34,7 +31,9 @@ const display = (value?: string) => value?.trim() || "Not specified";
 export function buildDeviationAgents(input: DeviationAgentInput): AgentDefinition[] {
   const deviationId = display(input.deviationId);
   const batch = display(input.batch);
+  const area = display(input.area);
   const equipment = display(input.equipment);
+  const classification = display(input.classification);
   const risk = display(input.risk);
   const description = input.description.trim() || "No deviation description provided.";
   const notes = input.investigationNotes?.trim();
@@ -43,13 +42,16 @@ export function buildDeviationAgents(input: DeviationAgentInput): AgentDefinitio
     {
       key: "understanding",
       name: "Deviation Understanding Agent",
-      description: "Analyzes the current deviation description, equipment, batch information and initial classification.",
+      description: "Analyzes the current deviation details supplied by the user.",
       result: {
-        headline: `Current deviation ${deviationId} is being assessed with an initial risk of ${risk}.`,
+        headline: `Current deviation ${deviationId} is being assessed using the submitted context.`,
         bullets: [
           `Deviation description: ${description}`,
+          `Classification: ${classification}`,
           `Batch: ${batch}`,
-          `Equipment / Area: ${equipment}`,
+          `Area: ${area}`,
+          `Equipment: ${equipment}`,
+          `Initial risk: ${risk}`,
           ...(notes ? [`Investigation notes: ${notes}`] : []),
         ],
       },
@@ -57,25 +59,27 @@ export function buildDeviationAgents(input: DeviationAgentInput): AgentDefinitio
     {
       key: "historical",
       name: "Historical Investigation Agent",
-      description: "Uses the current batch, equipment and deviation context when comparing historical records and patterns.",
+      description: "Scopes historical analysis using the current user-provided context.",
       result: {
-        headline: `Historical review is scoped to the current context for batch ${batch}.`,
+        headline: `Historical review is scoped to the current context for deviation ${deviationId}.`,
         items: [
-          { label: "Current deviation", value: `${deviationId} — ${description}` },
+          { label: "Current deviation", value: description },
           { label: "Current batch", value: batch },
-          { label: "Current equipment / area", value: equipment },
+          { label: "Current area", value: area },
+          { label: "Current equipment", value: equipment },
         ],
       },
     },
     {
       key: "impact",
       name: "Impact Assessment Agent",
-      description: "Assesses potential impact using the current deviation details instead of a fixed sample batch.",
+      description: "Assesses potential impact using only the current submitted deviation details.",
       result: {
-        headline: `Impact assessment is based on the current deviation, batch ${batch}, and equipment ${equipment}.`,
+        headline: `Impact assessment is based on deviation ${deviationId} and the current submitted context.`,
         items: [
           { label: "Batch under assessment", value: batch },
-          { label: "Equipment / Area", value: equipment },
+          { label: "Area", value: area },
+          { label: "Equipment", value: equipment },
           { label: "Initial risk", value: risk },
           ...(notes ? [{ label: "Latest evidence", value: notes }] : []),
         ],
@@ -84,13 +88,14 @@ export function buildDeviationAgents(input: DeviationAgentInput): AgentDefinitio
     {
       key: "qa",
       name: "QA Recommendation Agent",
-      description: "Generates QA recommendations using the same current deviation input shared with the other agents.",
+      description: "Prepares QA review context from the same current user input.",
       result: {
-        headline: `QA recommendations are prepared for ${deviationId}, batch ${batch}.`,
+        headline: `QA recommendations are prepared from the current details for ${deviationId}.`,
         bullets: [
           `Confirm evidence and investigation records for: ${description}`,
           `Assess product and batch impact for ${batch}`,
-          `Review equipment / area history for ${equipment}`,
+          `Review area history for ${area}`,
+          `Review equipment history for ${equipment}`,
           `Verify whether the initial ${risk} risk classification remains appropriate`,
           ...(notes ? ["Incorporate the latest investigation notes into QA review"] : []),
         ],
@@ -99,38 +104,30 @@ export function buildDeviationAgents(input: DeviationAgentInput): AgentDefinitio
   ];
 }
 
-const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-export async function analyzeDeviation(input?: DeviationAgentInput): Promise<AgentResult> {
-  await delay(2000);
-  return buildDeviationAgents(input ?? { description: "No deviation description provided." })[0].result;
+export async function analyzeDeviation(input: DeviationAgentInput): Promise<AgentResult> {
+  return buildDeviationAgents(input)[0].result;
 }
 
-export async function investigateHistoricalRecords(input?: DeviationAgentInput): Promise<AgentResult> {
-  await delay(2000);
-  return buildDeviationAgents(input ?? { description: "No deviation description provided." })[1].result;
+export async function investigateHistoricalRecords(input: DeviationAgentInput): Promise<AgentResult> {
+  return buildDeviationAgents(input)[1].result;
 }
 
-export async function assessImpact(input?: DeviationAgentInput): Promise<AgentResult> {
-  await delay(2000);
-  return buildDeviationAgents(input ?? { description: "No deviation description provided." })[2].result;
+export async function assessImpact(input: DeviationAgentInput): Promise<AgentResult> {
+  return buildDeviationAgents(input)[2].result;
 }
 
-export async function generateQARecommendations(input?: DeviationAgentInput): Promise<AgentResult> {
-  await delay(2000);
-  return buildDeviationAgents(input ?? { description: "No deviation description provided." })[3].result;
+export async function generateQARecommendations(input: DeviationAgentInput): Promise<AgentResult> {
+  return buildDeviationAgents(input)[3].result;
 }
 
-export const DEVIATION_AGENTS: AgentDefinition[] = buildDeviationAgents({
-  description: "No live deviation has been selected yet.",
-});
+export const DEVIATION_AGENTS: AgentDefinition[] = buildDeviationAgents({ description: "" });
 
 export const CHANGE_IMPACT_STEPS: AgentDefinition[] = [
-  { key: "request", name: "Change Request Intake", description: "Parses the change request, category and requested scope.", result: { headline: "Change request parsed and categorized as an equipment change." } },
-  { key: "equipment", name: "Equipment Impact", description: "Evaluates equipment records, qualification status and interfaces.", result: { headline: "Reactor R-102 affected." } },
-  { key: "sop", name: "SOP Impact", description: "Identifies procedures that require revision or review.", result: { headline: "2 SOPs require review.", items: [{ label: "SOP-102", value: "Reactor Temperature Monitoring" }, { label: "SOP-115", value: "Batch Processing Procedure" }] } },
-  { key: "training", name: "Training Impact", description: "Determines training records affected by the proposed change.", result: { headline: "Operator refresher training may be required." } },
-  { key: "validation", name: "Validation Impact", description: "Assesses qualification and validation activities triggered by the change.", result: { headline: "QA assessment recommended." } },
-  { key: "history", name: "Historical Deviation Analysis", description: "Reviews deviations historically linked to the equipment and procedures.", result: { headline: "3 related deviations identified.", items: [{ label: "DEV-1023" }, { label: "DEV-1017" }, { label: "DEV-0982" }] } },
-  { key: "overall", name: "Overall Impact Assessment", description: "Consolidates all agent findings into an overall impact rating.", result: { headline: "Overall impact rated MEDIUM." } },
+  { key: "request", name: "Change Request Intake", description: "Parses the submitted change request, category and requested scope.", result: { headline: "Change request context will be derived from the selected request." } },
+  { key: "equipment", name: "Equipment Impact", description: "Evaluates equipment records, qualification status and interfaces.", result: { headline: "Equipment impact depends on the selected change request." } },
+  { key: "sop", name: "SOP Impact", description: "Identifies procedures that require revision or review.", result: { headline: "Procedure impact depends on linked records." } },
+  { key: "training", name: "Training Impact", description: "Determines training records affected by the proposed change.", result: { headline: "Training impact depends on the submitted change scope." } },
+  { key: "validation", name: "Validation Impact", description: "Assesses qualification and validation activities triggered by the change.", result: { headline: "Validation requirements depend on the submitted change." } },
+  { key: "history", name: "Historical Deviation Analysis", description: "Reviews deviations historically linked to the selected context.", result: { headline: "Historical records must be supplied by the connected data source." } },
+  { key: "overall", name: "Overall Impact Assessment", description: "Consolidates all available findings into an overall impact rating.", result: { headline: "Overall impact is calculated from the current change context." } },
 ];
