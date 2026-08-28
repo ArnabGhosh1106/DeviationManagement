@@ -1,5 +1,6 @@
 import { Info } from "lucide-react";
 import { RiskBadge } from "./badges";
+import type { DeviationAgentInput } from "@/lib/ai-agents";
 import type { Risk } from "@/lib/mock-data";
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -20,68 +21,89 @@ function Chip({ label, note }: { label: string; note?: string }) {
   );
 }
 
-export function InvestigationSummary({ risk = "High" as Risk }: { risk?: Risk }) {
+const display = (value?: string) => value?.trim() || "Not specified";
+
+function deriveRootCause(input: DeviationAgentInput) {
+  const notes = input.investigationNotes?.trim();
+  if (notes) return notes;
+  if (input.description.trim()) return `Requires investigation based on: ${input.description.trim()}`;
+  return "No root-cause evidence has been provided yet.";
+}
+
+export function InvestigationSummary({
+  risk,
+  input,
+}: {
+  risk?: Risk;
+  input: DeviationAgentInput;
+}) {
+  const deviationId = display(input.deviationId);
+  const description = display(input.description);
+  const batch = display(input.batch);
+  const equipment = display(input.equipment);
+  const notes = input.investigationNotes?.trim();
+
   return (
     <section className="rise-in space-y-4">
       <div className="surface-card p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="text-lg font-semibold tracking-tight">Investigation Summary</h2>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Risk</span>
-            <RiskBadge risk={risk} />
-          </div>
+          {risk ? (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Risk</span>
+              <RiskBadge risk={risk} />
+            </div>
+          ) : null}
         </div>
         <div className="mt-4 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3">
           <p className="text-xs font-medium tracking-wide text-warning-foreground uppercase">
-            Potential Root Cause
+            Current Investigation Context
           </p>
           <p className="mt-1 text-sm font-medium text-foreground">
-            Potential temperature sensor calibration issue
+            {deriveRootCause(input)}
           </p>
         </div>
         <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
           <Info className="mt-0.5 size-3.5 shrink-0" />
-          AI-generated assessment. Final classification and disposition require QA review.
+          Values below are generated from the current user input and update when the deviation details change.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Card title="Similar Historical Deviations">
-          <Chip label="DEV-0982" note="Temperature excursion — Reactor R-102" />
-          <Chip label="DEV-0917" note="Sensor drift — Reactor R-102" />
-          <Chip label="DEV-0872" note="Jacket control loop instability" />
+        <Card title="Current Deviation">
+          <Chip label={deviationId} note={description} />
         </Card>
 
-        <Card title="Potentially Affected SOPs">
-          <Chip label="SOP-102" note="Reactor Temperature Monitoring" />
-          <Chip label="SOP-115" note="Batch Processing Procedure" />
+        <Card title="Current Batch">
+          <Chip label={batch} note="Batch under assessment" />
         </Card>
 
-        <Card title="Affected Equipment">
-          <Chip label="Reactor R-102" note="Manufacturing Area 3" />
+        <Card title="Current Equipment / Area">
+          <Chip label={equipment} note="Equipment or area under assessment" />
         </Card>
 
-        <Card title="Potential Batch Impact">
-          <Chip label="B12345" note="Requires QA assessment" />
+        <Card title="Investigation Notes">
+          <Chip label={notes || "No notes provided"} />
         </Card>
 
-        <Card title="Existing CAPAs">
-          <Chip label="CAPA-2041" note="Temperature monitoring improvement" />
+        <Card title="Potential Impact">
+          <Chip label="To be assessed" note={`Assess impact for ${batch} in relation to ${equipment}.`} />
         </Card>
 
-        <Card title="Recommended Actions">
+        <Card title="Recommended Next Steps">
           <ol className="space-y-2">
             {[
-              "Review temperature sensor calibration history.",
-              "Assess potential batch impact.",
-              "Review related maintenance records.",
-              "Evaluate existing CAPA effectiveness.",
-            ].map((a, i) => (
-              <li key={a} className="flex gap-2.5">
+              `Confirm evidence for ${deviationId}.`,
+              `Assess the impact of ${description}.`,
+              `Review records associated with ${batch}.`,
+              `Review history and status for ${equipment}.`,
+              "Have authorized QA personnel review the final findings.",
+            ].map((action, index) => (
+              <li key={action} className="flex gap-2.5">
                 <span className="grid size-5 shrink-0 place-items-center rounded-full bg-info-soft font-mono text-[10px] font-semibold text-primary">
-                  {i + 1}
+                  {index + 1}
                 </span>
-                <span className="text-sm">{a}</span>
+                <span className="text-sm">{action}</span>
               </li>
             ))}
           </ol>
